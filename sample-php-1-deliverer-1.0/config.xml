@@ -1,0 +1,119 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<project>
+  <actions/>
+  <description></description>
+  <keepDependencies>false</keepDependencies>
+  <properties/>
+  <scm class="hudson.plugins.git.GitSCM" plugin="git@3.5.1">
+    <configVersion>2</configVersion>
+    <userRemoteConfigs>
+      <hudson.plugins.git.UserRemoteConfig>
+        <url>git@github.com:kabass/sample-php-1</url>
+        <credentialsId>e829ff57-3c43-442b-b783-fba3406bee2d</credentialsId>
+      </hudson.plugins.git.UserRemoteConfig>
+    </userRemoteConfigs>
+    <branches>
+      <hudson.plugins.git.BranchSpec>
+        <name>*/master</name>
+      </hudson.plugins.git.BranchSpec>
+    </branches>
+    <doGenerateSubmoduleConfigurations>false</doGenerateSubmoduleConfigurations>
+    <submoduleCfg class="list"/>
+    <extensions/>
+  </scm>
+  <canRoam>true</canRoam>
+  <disabled>false</disabled>
+  <blockBuildWhenDownstreamBuilding>false</blockBuildWhenDownstreamBuilding>
+  <blockBuildWhenUpstreamBuilding>false</blockBuildWhenUpstreamBuilding>
+  <triggers/>
+  <concurrentBuild>false</concurrentBuild>
+  <builders>
+    <hudson.tasks.Shell>
+      <command>#!/bin/bash
+
+# check branch synchronizatio
+## get all branch
+branches=()
+git branch -r  | grep -v &quot;origin/HEAD&quot;  | sed &quot;s/^[ \t]*//;s/[ \t]*$//&quot; | sed &quot;s/^origin\///&quot;  | grep -v &quot;^$&quot; &gt; branches
+
+while read -r line # Loop through all the lines in the branches file
+do
+if [[ &quot;$line&quot; =~ [0-9]+(\.[0-9]+)?$ ]]; then
+branches+=($line)
+fi
+done &lt; branches
+rm  branches
+
+## select branch to check
+selectedBranches=()
+selectedBranches+=(&quot;1.0&quot;)
+for ((i=0; i&lt;(${#branches[*]}); i++));
+do
+   if [[ ${branches[i]}  &gt; &quot;1.0&quot; ]]; then
+     selectedBranches+=(${branches[i]})
+   fi
+done
+selectedBranches+=(&quot;master&quot;)
+
+## check selected branch
+for ((i=0; i&lt;(${#selectedBranches[*]}-1); i++));
+do
+   git checkout ${selectedBranches[i+1]}
+   git merge &quot;origin/${selectedBranches[(i)]}&quot; --ff-only
+done
+
+
+
+
+git checkout -b 1.0 origin/1.0
+
+# geting current version
+IN=$(jq .version composer.json)
+set -- &quot;$IN&quot; 
+IFS=&quot;.&quot;; declare -a Array=($*) 
+IN=&quot;${Array[2]}&quot; 
+set -- &quot;$IN&quot; 
+IFS=&quot;-&quot;; 
+declare -a Array=($*) 
+declare -a  NVERSION=${Array[0]}
+NPLUSVERSION=$((${NVERSION}+1))
+
+# taging version
+jq .version=&quot;\&quot;1.0.${NVERSION}\&quot;&quot; composer.json | sponge composer.json
+git add .
+git commit -m &quot;jenkins : update version&quot;
+git tag -a &quot;1.0.${NVERSION}&quot; -m &quot;taging version&quot;
+git push --tags
+
+# incrementing version in branch
+jq .version=&quot;\&quot;1.0.${NPLUSVERSION}-dev\&quot;&quot; composer.json | sponge composer.json
+git add .
+git commit -m &quot;jenkins : adding version&quot;
+git push origin 1.0
+
+
+for ((i=1; i&lt;(${#selectedBranches[*]}); i++));
+do
+   git checkout ${selectedBranches[i]} 
+   git rebase &quot;origin/${selectedBranches[i]}&quot; 
+   branch_version=$(jq .version composer.json)
+   git merge &quot;${selectedBranches[i-1]}&quot;  --no-edit  -X ours
+   jq .version=&quot;$branch_version&quot; composer.json | sponge composer.json
+   git commit -am &quot;jenkins : merge release branch&quot; --allow-empty
+   git push origin ${selectedBranches[i]}
+
+done
+
+
+</command>
+    </hudson.tasks.Shell>
+  </builders>
+  <publishers/>
+  <buildWrappers>
+    <hudson.plugins.ws__cleanup.PreBuildCleanup plugin="ws-cleanup@0.34">
+      <deleteDirs>false</deleteDirs>
+      <cleanupParameter></cleanupParameter>
+      <externalDelete></externalDelete>
+    </hudson.plugins.ws__cleanup.PreBuildCleanup>
+  </buildWrappers>
+</project>
