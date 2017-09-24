@@ -14,7 +14,7 @@
     </userRemoteConfigs>
     <branches>
       <hudson.plugins.git.BranchSpec>
-        <name>*/master</name>
+        <name>*/1.0</name>
       </hudson.plugins.git.BranchSpec>
     </branches>
     <doGenerateSubmoduleConfigurations>false</doGenerateSubmoduleConfigurations>
@@ -28,6 +28,9 @@
   <triggers/>
   <concurrentBuild>false</concurrentBuild>
   <builders>
+    <hudson.tasks.Ant plugin="ant@1.5">
+      <targets></targets>
+    </hudson.tasks.Ant>
     <hudson.tasks.Shell>
       <command>#!/bin/bash
 
@@ -58,8 +61,14 @@ selectedBranches+=(&quot;master&quot;)
 ## check selected branch
 for ((i=0; i&lt;(${#selectedBranches[*]}-1); i++));
 do
-   git checkout ${selectedBranches[i+1]}
+   git checkout ${selectedBranches[(i+1)]}
    git merge &quot;origin/${selectedBranches[(i)]}&quot; --ff-only
+   
+   if [ ${?} -ne 0 ]; then
+    echo &quot; branch  ${selectedBranches[(i)]} not merged to branch ${selectedBranches[(i+1)]}&quot;
+    exit 1
+   fi 
+   
 done
 
 
@@ -105,7 +114,17 @@ do
 done
 
 
-</command>
+# publishing artefact
+git checkout &quot;1.0.${NVERSION}&quot;
+composer install
+rm -rf .git
+rm .gitignore
+git init
+git remote add origin git@github.com:kabass/artefacts.git
+git add .
+git commit -m &quot;versioning&quot;
+git tag -a &quot;sample-php-1-1.0.${NVERSION}&quot; -m &quot;taging version&quot;
+git push --tags</command>
     </hudson.tasks.Shell>
   </builders>
   <publishers/>
