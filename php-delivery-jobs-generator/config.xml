@@ -11,11 +11,11 @@
           <description></description>
           <defaultValue></defaultValue>
         </org.jenkinsci.plugins.jobgenerator.parameters.GeneratorKeyValueParameterDefinition>
-        <hudson.model.StringParameterDefinition>
+        <org.jenkinsci.plugins.jobgenerator.parameters.GeneratorKeyValueParameterDefinition>
           <name>VERSION</name>
           <description></description>
           <defaultValue></defaultValue>
-        </hudson.model.StringParameterDefinition>
+        </org.jenkinsci.plugins.jobgenerator.parameters.GeneratorKeyValueParameterDefinition>
       </parameterDefinitions>
     </hudson.model.ParametersDefinitionProperty>
   </properties>
@@ -46,8 +46,8 @@
     <hudson.tasks.Shell>
       <command>#!/bin/bash
 
-
-# verify branch synhronization 
+# check branch synchronizatio
+## get all branch
 branches=()
 git branch -r  | grep -v &quot;origin/HEAD&quot;  | sed &quot;s/^[ \t]*//;s/[ \t]*$//&quot; | sed &quot;s/^origin\///&quot;  | grep -v &quot;^$&quot; &gt; branches
 
@@ -59,7 +59,54 @@ fi
 done &lt; branches
 rm  branches
 
-## select branch to check
+branches+=(&quot;master&quot;)
+
+
+## check selected branch
+for ((i=0; i&lt;(${#branches[*]}-1); i++));
+do
+   git checkout ${branches[(i+1)]}
+   git merge &quot;origin/${branches[(i)]}&quot; --ff-only
+   
+   if [ ${?} -ne 0 ]; then
+    echo &quot; branch  ${branches[(i)]} not merged to branch ${branches[(i+1)]}&quot;
+    exit 1
+   fi 
+   
+done
+
+
+
+
+git checkout -b ${VERSION} origin/${VERSION}
+
+# geting current version
+IN=$(jq .version composer.json)
+set -- &quot;$IN&quot; 
+IFS=&quot;.&quot;; declare -a Array=($*) 
+IN=&quot;${Array[2]}&quot; 
+set -- &quot;$IN&quot; 
+IFS=&quot;-&quot;; 
+declare -a Array=($*) 
+declare -a  NVERSION=${Array[0]}
+NPLUSVERSION=$((${NVERSION}+1))
+
+# taging version
+jq .version=&quot;\&quot;${VERSION}.${NVERSION}\&quot;&quot; composer.json | sponge composer.json
+git add .
+git commit -m &quot;jenkins : update version&quot;
+git tag -a &quot;${VERSION}.${NVERSION}&quot; -m &quot;taging version&quot;
+git push --tags
+
+# incrementing version in branch
+jq .version=&quot;\&quot;${VERSION}.${NPLUSVERSION}-dev\&quot;&quot; composer.json | sponge composer.json
+git add .
+git commit -m &quot;jenkins : adding version&quot;
+git push origin ${VERSION}
+
+# merging to other branch
+
+## select branch to merge
 selectedBranches=()
 selectedBranches+=(&quot;${VERSION}&quot;)
 for ((i=0; i&lt;(${#branches[*]}); i++));
@@ -70,25 +117,33 @@ do
 done
 selectedBranches+=(&quot;master&quot;)
 
-for ((i=0; i&lt;(${#selectedBranches[*]}-1); i++));
+## loop branch and merge
+for ((i=1; i&lt;(${#selectedBranches[*]}); i++));
 do
-   git checkout ${selectedBranches[i+1]}
-   git merge &quot;origin/${selectedBranches[(i)]}&quot; --ff-only
+   git checkout ${selectedBranches[i]} 
+   git rebase &quot;origin/${selectedBranches[i]}&quot; 
+   branch_version=$(jq .version composer.json)
+   git merge &quot;${selectedBranches[i-1]}&quot;  --no-edit  -X ours
+   jq .version=&quot;$branch_version&quot; composer.json | sponge composer.json
+   git commit -am &quot;jenkins : merge release branch&quot; --allow-empty
+   git push origin ${selectedBranches[i]}
+
 done
 
 
-git checkout -b ${VERSION} origin/${VERSION}
-IN=&quot;1.0.0-dev&quot; 
-set -- &quot;$IN&quot; 
-IFS=&quot;.&quot;; declare -a Array=($*) 
-IN=&quot;${Array[2]}&quot; 
-set -- &quot;$IN&quot; 
-IFS=&quot;-&quot;; declare -a Array=($*) 
- 
-export nversion =${Array[0]}
-export nplusversion =${Array[0]}+1 
-echo &quot;${nversion}&quot;
-echo &quot;${nplusversion}&quot;
+# publishing artefact
+# git checkout &quot;${VERSION}.${NVERSION}&quot;
+# composer install
+# rm -rf .git
+# rm composer.lock	
+# rm .gitignore
+# git init
+# git remote add origin git@github.com:kabass/artefacts.git
+# git add .
+# git commit -m &quot;versioning&quot;
+# git tag -a &quot;sample-php-1-${VERSION}.${NVERSION}&quot; -m &quot;taging version&quot;
+#git tag -a &quot;${VERSION}.${NVERSION}&quot; -m &quot;taging version&quot;
+# git push --tags
 </command>
     </hudson.tasks.Shell>
   </builders>
@@ -100,7 +155,7 @@ echo &quot;${nplusversion}&quot;
       <externalDelete></externalDelete>
     </hudson.plugins.ws__cleanup.PreBuildCleanup>
   </buildWrappers>
-  <generatedJobName>${PROJECT_NAME}-release-job</generatedJobName>
-  <generatedDisplayJobName>${PROJECT_NAME}-release-job</generatedDisplayJobName>
+  <generatedJobName>${PROJECT_NAME}-${VERSION}-deliverer</generatedJobName>
+  <generatedDisplayJobName>${PROJECT_NAME}-${VERSION}-deliverer</generatedDisplayJobName>
   <autoRunJob>false</autoRunJob>
 </org.jenkinsci.plugins.jobgenerator.JobGenerator>

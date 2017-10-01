@@ -11,11 +11,6 @@
           <description></description>
           <defaultValue></defaultValue>
         </org.jenkinsci.plugins.jobgenerator.parameters.GeneratorKeyValueParameterDefinition>
-        <org.jenkinsci.plugins.jobgenerator.parameters.GeneratorKeyValueParameterDefinition>
-          <name>VERSION_PARAM</name>
-          <description></description>
-          <defaultValue></defaultValue>
-        </org.jenkinsci.plugins.jobgenerator.parameters.GeneratorKeyValueParameterDefinition>
       </parameterDefinitions>
     </hudson.model.ParametersDefinitionProperty>
   </properties>
@@ -29,7 +24,7 @@
     </userRemoteConfigs>
     <branches>
       <hudson.plugins.git.BranchSpec>
-        <name>*/${VERSION_PARAM}</name>
+        <name>*/master</name>
       </hudson.plugins.git.BranchSpec>
     </branches>
     <doGenerateSubmoduleConfigurations>false</doGenerateSubmoduleConfigurations>
@@ -43,9 +38,50 @@
   <triggers/>
   <concurrentBuild>false</concurrentBuild>
   <builders>
-    <hudson.tasks.Ant plugin="ant@1.5">
-      <targets></targets>
-    </hudson.tasks.Ant>
+    <hudson.tasks.Shell>
+      <command>#!/bin/bash
+
+# check branch synchronizatio
+## get all branch
+branches=()
+git branch -r  | grep -v &quot;origin/HEAD&quot;  | sed &quot;s/^[ \t]*//;s/[ \t]*$//&quot; | sed &quot;s/^origin\///&quot;  | grep -v &quot;^$&quot; &gt; branches
+
+while read -r line # Loop through all the lines in the branches file
+do
+if [[ &quot;$line&quot; =~ [0-9]+(\.[0-9]+)?$ ]]; then
+branches+=($line)
+fi
+done &lt; branches
+rm  branches
+
+## select branch to check
+#selectedBranches=()
+#selectedBranches+=(&quot;${VERSION}&quot;)
+#for ((i=0; i&lt;(${#branches[*]}); i++));
+#do
+#   if [[ ${branches[i]}  &gt; &quot;${VERSION}&quot; ]]; then
+#     selectedBranches+=(${branches[i]})
+#   fi
+#done
+#selectedBranches+=(&quot;master&quot;)
+
+## check selected branch
+branches+=(&quot;master&quot;)
+for ((i=0; i&lt;(${#branches[*]}-1); i++));
+do
+   git checkout ${branches[(i+1)]}
+   git merge &quot;origin/${branches[(i)]}&quot; --ff-only
+   
+   if [ ${?} -ne 0 ]; then
+    echo &quot; branch  ${branches[(i)]} not merged to branch ${branches[(i+1)]}&quot;
+    exit 1
+   fi 
+   
+done
+
+
+</command>
+    </hudson.tasks.Shell>
   </builders>
   <publishers/>
   <buildWrappers>
@@ -55,7 +91,7 @@
       <externalDelete></externalDelete>
     </hudson.plugins.ws__cleanup.PreBuildCleanup>
   </buildWrappers>
-  <generatedJobName>${PROJECT_NAME_PARAM}-${VERSION_PARAM}-analizer</generatedJobName>
-  <generatedDisplayJobName>${PROJECT_NAME_PARAM}-${VERSION_PARAM}-analizer</generatedDisplayJobName>
-  <autoRunJob>true</autoRunJob>
+  <generatedJobName>${PROJECT_NAME_PARAM}-branch-checker</generatedJobName>
+  <generatedDisplayJobName>${PROJECT_NAME_PARAM}-branch-checker</generatedDisplayJobName>
+  <autoRunJob>false</autoRunJob>
 </org.jenkinsci.plugins.jobgenerator.JobGenerator>

@@ -57,7 +57,9 @@ git merge ${VERSION} --no-edit
 jq .version=&quot;\&quot;dev\&quot;&quot; composer.json | sponge composer.json
 git commit -am &quot;jenkins : merge release branch&quot; --allow-empty
 git push origin master
-java -jar ~/logiciel/jenkins/jenkins-cli.jar -s http://localhost:8080 -auth admin:admin  build php-branch-analizer-job-generator -p BRANCH_NAME=${VERSION} -p PROJECT_NAME=${PROJECT_NAME}
+
+java -jar ~/logiciel/jenkins/jenkins-cli.jar -s http://localhost:8080 -auth admin:admin  build php-branch-analizer-job-generator -p VERSION_PARAM=${VERSION} -p PROJECT_NAME_PARAM=${PROJECT_NAME}
+java -jar ~/logiciel/jenkins/jenkins-cli.jar -s http://localhost:8080 -auth admin:admin  build php-delivery-jobs-generator -p VERSION=${VERSION} -p PROJECT_NAME=${PROJECT_NAME}
 </command>
     </hudson.tasks.Shell>
   </builders>
