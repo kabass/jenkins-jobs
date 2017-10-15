@@ -131,6 +131,7 @@ do
 done
 
 
+
 # publishing artefact
 # git checkout &quot;${VERSION}.${NVERSION}&quot;
 # composer install
@@ -144,6 +145,11 @@ done
 # git tag -a &quot;sample-php-1-${VERSION}.${NVERSION}&quot; -m &quot;taging version&quot;
 #git tag -a &quot;${VERSION}.${NVERSION}&quot; -m &quot;taging version&quot;
 # git push --tags
+
+
+# Sending a mail
+
+java -jar ~/logiciel/jenkins/jenkins-cli.jar -s http://localhost:8080 -auth admin:admin  build email-sender-job -p VERSION_PARAM=${VERSION}.${NVERSION} -p PROJECT_NAME_PARAM=${PROJECT_NAME}
 </command>
     </hudson.tasks.Shell>
   </builders>

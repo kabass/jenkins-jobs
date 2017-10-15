@@ -1,0 +1,112 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<project>
+  <actions/>
+  <description></description>
+  <keepDependencies>false</keepDependencies>
+  <properties>
+    <hudson.model.ParametersDefinitionProperty>
+      <parameterDefinitions>
+        <hudson.model.StringParameterDefinition>
+          <name>PROJECT_NAME_PARAM</name>
+          <description></description>
+          <defaultValue></defaultValue>
+        </hudson.model.StringParameterDefinition>
+        <hudson.model.StringParameterDefinition>
+          <name>VERSION_PARAM</name>
+          <description></description>
+          <defaultValue></defaultValue>
+        </hudson.model.StringParameterDefinition>
+      </parameterDefinitions>
+    </hudson.model.ParametersDefinitionProperty>
+  </properties>
+  <scm class="hudson.scm.NullSCM"/>
+  <canRoam>true</canRoam>
+  <disabled>false</disabled>
+  <blockBuildWhenDownstreamBuilding>false</blockBuildWhenDownstreamBuilding>
+  <blockBuildWhenUpstreamBuilding>false</blockBuildWhenUpstreamBuilding>
+  <triggers/>
+  <concurrentBuild>false</concurrentBuild>
+  <builders/>
+  <publishers>
+    <hudson.plugins.emailext.ExtendedEmailPublisher plugin="email-ext@2.58">
+      <recipientList>cc:ka.bassirou22@gmail.com</recipientList>
+      <configuredTriggers>
+        <hudson.plugins.emailext.plugins.trigger.AlwaysTrigger>
+          <email>
+            <subject>$PROJECT_DEFAULT_SUBJECT</subject>
+            <body>$PROJECT_DEFAULT_CONTENT</body>
+            <recipientProviders>
+              <hudson.plugins.emailext.plugins.recipients.ListRecipientProvider/>
+            </recipientProviders>
+            <attachmentsPattern></attachmentsPattern>
+            <attachBuildLog>false</attachBuildLog>
+            <compressBuildLog>false</compressBuildLog>
+            <replyTo>$PROJECT_DEFAULT_REPLYTO</replyTo>
+            <contentType>project</contentType>
+          </email>
+        </hudson.plugins.emailext.plugins.trigger.AlwaysTrigger>
+      </configuredTriggers>
+      <contentType>default</contentType>
+      <defaultSubject>$DEFAULT_SUBJECT</defaultSubject>
+      <defaultContent>$DEFAULT_CONTENT</defaultContent>
+      <attachmentsPattern></attachmentsPattern>
+      <presendScript>import javax.mail.internet.*
+import groovy.json.JsonSlurper
+
+def projectName = build.buildVariableResolver.resolve(&quot;PROJECT_NAME_PARAM&quot;)
+def version = build.buildVariableResolver.resolve(&quot;VERSION_PARAM&quot;)
+def param = &quot;jql=project=&quot;+projectName+&quot;%20AND%20fixVersion=&quot;+version
+def connection = new URL( &quot;https://sivaltec.atlassian.net/rest/api/2/search?&quot;+param).openConnection() as HttpURLConnection
+
+// set some headers
+connection.setRequestProperty( &apos;User-Agent&apos;, &apos;groovy-2.4.4&apos; )
+connection.setRequestProperty( &apos;Accept&apos;, &apos;application/json&apos; )
+connection.setRequestProperty( &apos;Authorization&apos;, &apos;Basic &apos; + &apos;ka.bassirou22@gmail.com:kobebryan123&apos;.bytes.encodeBase64().toString())
+
+def messageContent = &quot;&quot;
+if ( connection.responseCode == 200 ) {
+
+    // get the JSON response
+    def json = connection.inputStream.withCloseable { inStream -&gt;
+        new JsonSlurper().parse( inStream as InputStream )
+    }
+
+    // extract some data from the JSON, printing a report
+    def item = json.issues
+   // println item.title
+   // println &quot;Temperature: ${item.condition?.temp}, Condition: ${item.condition?.text}&quot;
+
+    // show some forecasts
+   // println &quot;Forecasts:&quot;
+messageContent+=&quot;&lt;p&gt; Ci-dessous la liste des évolutions ou anomalies inclues dans cette livraison &lt;/p&gt;&quot;
+messageContent+=&quot;&lt;ul&gt;&quot;
+    item.forecast.each { f -&gt;
+       messageContent += &quot; &lt;li&gt; &lt;a href= &apos;https://sivaltec.atlassian.net/browse/${item.key[0]}&apos;&gt;  ${item.fields.summary[0]} &lt;/a&gt; &lt;/li&gt;&quot;
+      //  println &quot; * ${f.date} - Low: ${f.low}, High: ${f.high}, Condition: ${f.text}&quot;
+ messageContent+=&quot;&lt;/ul&gt;&quot;
+    }
+} else {
+    println connection.responseCode + &quot;: &quot; + connection.inputStream.text
+}
+
+
+logger.print(&quot;This ends up in the log as well&quot;);
+String encodingOptions = &quot;text/html; charset=UTF-8;&quot;;
+msg.setContent(messageContent, encodingOptions);
+msg.setSubject(&quot;Livraison de la version &quot;+version+&quot; de l&apos;application &quot;+projectName+&quot;.&quot;, encodingOptions);</presendScript>
+      <postsendScript>$DEFAULT_POSTSEND_SCRIPT</postsendScript>
+      <attachBuildLog>false</attachBuildLog>
+      <compressBuildLog>false</compressBuildLog>
+      <replyTo>$DEFAULT_REPLYTO</replyTo>
+      <saveOutput>false</saveOutput>
+      <disabled>false</disabled>
+    </hudson.plugins.emailext.ExtendedEmailPublisher>
+  </publishers>
+  <buildWrappers>
+    <hudson.plugins.ws__cleanup.PreBuildCleanup plugin="ws-cleanup@0.34">
+      <deleteDirs>false</deleteDirs>
+      <cleanupParameter></cleanupParameter>
+      <externalDelete></externalDelete>
+    </hudson.plugins.ws__cleanup.PreBuildCleanup>
+  </buildWrappers>
+</project>
